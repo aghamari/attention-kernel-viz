@@ -1,24 +1,45 @@
-import React from 'react';
-import logo from './logo.svg';
+import React, { useState } from 'react';
 import './App.css';
+import LandingPage from './LandingPage';
+import UnifiedAttentionApp from './apps/UnifiedAttentionApp';
+import FlashAttentionApp from './apps/FlashAttentionApp';
+import PagedAttentionApp from './apps/PagedAttentionApp';
+import LeanAttentionApp from './apps/LeanAttentionApp';
+import HSTUAttentionApp from './apps/HSTUAttentionApp';
+import MLADecodeApp from './apps/MLADecodeApp';
+import SageAttentionApp from './apps/SageAttentionApp';
+import PODAttentionApp from './apps/PODAttentionApp';
+import { AttentionType } from './types/attention';
 
 function App() {
+  const [currentApp, setCurrentApp] = useState<AttentionType | 'landing'>('landing');
+
+  const renderApp = () => {
+    switch (currentApp) {
+      case 'unified':
+        return <UnifiedAttentionApp onBack={() => setCurrentApp('landing')} />;
+      case 'flash':
+        return <FlashAttentionApp onBack={() => setCurrentApp('landing')} />;
+      case 'paged':
+        return <PagedAttentionApp onBack={() => setCurrentApp('landing')} />;
+      case 'lean':
+        return <LeanAttentionApp onBack={() => setCurrentApp('landing')} />;
+      case 'hstu':
+        return <HSTUAttentionApp onBack={() => setCurrentApp('landing')} />;
+      case 'mla':
+        return <MLADecodeApp onBack={() => setCurrentApp('landing')} />;
+      case 'sage':
+        return <SageAttentionApp onBack={() => setCurrentApp('landing')} />;
+      case 'pod':
+        return <PODAttentionApp onBack={() => setCurrentApp('landing')} />;
+      default:
+        return <LandingPage onSelectKernel={(type) => setCurrentApp(type)} />;
+    }
+  };
+
   return (
     <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+      {renderApp()}
     </div>
   );
 }
