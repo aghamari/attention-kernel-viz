@@ -1,9 +1,8 @@
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Play } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { useHSTUAttentionStore } from '../store/hstuAttentionStore';
-import InputPanel from '../components/shared/InputPanel';
-import MetricsDashboard from '../components/shared/MetricsDashboard';
+import ConfigDisplay from '../components/shared/ConfigDisplay';
 import ParameterGlossary from '../components/shared/ParameterGlossary';
 import { createHSTUGlossaryEntries } from '../data/glossaries/hstuGlossary';
 
@@ -14,14 +13,10 @@ interface HSTUAttentionAppProps {
 const HSTUAttentionApp: React.FC<HSTUAttentionAppProps> = ({ onBack }) => {
   const {
     config,
-    performance,
-    currentPhase,
     activeTab,
     activationComparison,
     jaggedSequences,
-    setConfig,
     setActiveTab,
-    runSimulation,
     updateActivationComparison,
     initializeJaggedSequences
   } = useHSTUAttentionStore();
@@ -63,22 +58,20 @@ const HSTUAttentionApp: React.FC<HSTUAttentionAppProps> = ({ onBack }) => {
 
       <div className="overview-layout">
         <div className="left-panel">
-          <InputPanel
+          <ConfigDisplay
             title="Configuration"
-            sliders={[
-              { label: 'Batch Size', value: config.batchSize, min: 1, max: 16, onChange: v => setConfig({ batchSize: v }) },
-              { label: 'Sequence Length', value: config.seqLen, min: 64, max: 2048, step: 64, onChange: v => setConfig({ seqLen: v }) },
-              { label: 'Num Heads', value: config.numHeads, min: 1, max: 32, onChange: v => setConfig({ numHeads: v }) },
-              { label: 'Alpha', value: config.alpha, min: 0.1, max: 2.0, step: 0.1, onChange: v => setConfig({ alpha: v }) }
+            params={[
+              { label: 'Batch Size', value: 4 },
+              { label: 'Sequence Length', value: 256 },
+              { label: 'Num Heads', value: 8 },
+              { label: 'Head Dim', value: 64 },
+              { label: 'Num KV Heads', value: 8 },
+              { label: 'Alpha', value: 1.0 },
+              { label: 'Max Seq Len K', value: 512 },
+              { label: 'Max Seq Len Q', value: 256 },
+              { label: 'Jagged Tensors', value: 'Enabled' },
             ]}
-            selects={[
-              { label: 'Jagged Tensors', value: config.useJaggedTensors, options: [{ value: true, label: 'Enabled' }, { value: false, label: 'Disabled' }], onChange: v => setConfig({ useJaggedTensors: v as boolean }) }
-            ]}
-          >
-            <button className="run-simulation-btn" onClick={runSimulation}>
-              <Play size={16} /> Run Simulation
-            </button>
-          </InputPanel>
+          />
         </div>
 
         <div className="center-panel">
@@ -95,8 +88,6 @@ const HSTUAttentionApp: React.FC<HSTUAttentionAppProps> = ({ onBack }) => {
                   <li><strong>Jagged Support:</strong> Efficient handling of variable-length sequences</li>
                 </ul>
               </div>
-
-              <MetricsDashboard metrics={performance} />
             </motion.div>
           </div>
 

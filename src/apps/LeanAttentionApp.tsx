@@ -1,9 +1,8 @@
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Play } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { useLeanAttentionStore } from '../store/leanAttentionStore';
-import InputPanel from '../components/shared/InputPanel';
-import MetricsDashboard from '../components/shared/MetricsDashboard';
+import ConfigDisplay from '../components/shared/ConfigDisplay';
 import ParameterGlossary from '../components/shared/ParameterGlossary';
 import { createLeanGlossaryEntries } from '../data/glossaries/leanGlossary';
 
@@ -15,15 +14,8 @@ const LeanAttentionApp: React.FC<LeanAttentionAppProps> = ({ onBack }) => {
   const {
     config,
     workUnits,
-    cuStates,
-    performance,
-    currentPhase,
     activeTab,
-    currentTime,
-    setConfig,
     setActiveTab,
-    runSimulation,
-    toggleWorkStealing,
     initializeWorkUnits
   } = useLeanAttentionStore();
 
@@ -68,23 +60,20 @@ const LeanAttentionApp: React.FC<LeanAttentionAppProps> = ({ onBack }) => {
 
       <div className="overview-layout">
         <div className="left-panel">
-          <InputPanel
+          <ConfigDisplay
             title="Configuration"
-            sliders={[
-              { label: 'Sequence Length', value: config.seqLen, min: 256, max: 8192, step: 256, onChange: v => setConfig({ seqLen: v }) },
-              { label: 'Num Heads', value: config.numHeads, min: 1, max: 32, onChange: v => setConfig({ numHeads: v }) },
-              { label: 'Num CUs', value: config.numCUs, min: 4, max: 120, step: 4, onChange: v => setConfig({ numCUs: v }) },
-              { label: 'Tiles Per CU', value: config.tilesPerCU, min: 1, max: 8, onChange: v => setConfig({ tilesPerCU: v }) }
+            params={[
+              { label: 'Batch Size', value: 1 },
+              { label: 'Sequence Length', value: 1024 },
+              { label: 'Num Heads', value: 8 },
+              { label: 'Head Dim', value: 64 },
+              { label: 'Num KV Heads', value: 8 },
+              { label: 'Num CUs', value: 8 },
+              { label: 'Tiles Per CU', value: 4 },
+              { label: 'Work Stealing', value: 'Enabled' },
+              { label: 'Persistent Kernel', value: 'Enabled' },
             ]}
-            selects={[
-              { label: 'Work Stealing', value: config.enableWorkStealing, options: [{ value: true, label: 'Enabled' }, { value: false, label: 'Disabled' }], onChange: v => setConfig({ enableWorkStealing: v as boolean }) },
-              { label: 'Persistent Kernel', value: config.persistentKernel, options: [{ value: true, label: 'Enabled' }, { value: false, label: 'Disabled' }], onChange: v => setConfig({ persistentKernel: v as boolean }) }
-            ]}
-          >
-            <button className="run-simulation-btn" onClick={runSimulation}>
-              <Play size={16} /> Run Simulation
-            </button>
-          </InputPanel>
+          />
         </div>
 
         <div className="center-panel">
@@ -101,14 +90,6 @@ const LeanAttentionApp: React.FC<LeanAttentionAppProps> = ({ onBack }) => {
                   <li><strong>Persistent Kernels:</strong> Single kernel launch processes all tiles</li>
                 </ul>
               </div>
-
-              <MetricsDashboard
-                metrics={performance}
-                additionalMetrics={[
-                  { label: 'Total Work Units', value: workUnits.length },
-                  { label: 'CUs Active', value: cuStates.filter(c => !c.isIdle).length }
-                ]}
-              />
             </motion.div>
           </div>
 

@@ -2,8 +2,7 @@ import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Play } from 'lucide-react';
 import { useMLADecodeStore } from '../store/mlaDecodeStore';
-import InputPanel from '../components/shared/InputPanel';
-import MetricsDashboard from '../components/shared/MetricsDashboard';
+import ConfigDisplay from '../components/shared/ConfigDisplay';
 import ParameterGlossary from '../components/shared/ParameterGlossary';
 import { createMLAGlossaryEntries } from '../data/glossaries/mlaGlossary';
 
@@ -14,12 +13,10 @@ interface MLADecodeAppProps {
 const MLADecodeApp: React.FC<MLADecodeAppProps> = ({ onBack }) => {
   const {
     config,
-    performance,
     currentPhase,
     activeTab,
     ropeState,
     latentState,
-    setConfig,
     setActiveTab,
     runSimulation,
     updateRoPEState,
@@ -63,24 +60,25 @@ const MLADecodeApp: React.FC<MLADecodeAppProps> = ({ onBack }) => {
 
       <div className="overview-layout">
         <div className="left-panel">
-          <InputPanel
+          <ConfigDisplay
             title="Configuration"
-            sliders={[
-              { label: 'Sequence Length', value: config.seqLen, min: 64, max: 2048, step: 64, onChange: v => setConfig({ seqLen: v }) },
-              { label: 'Num Heads', value: config.numHeads, min: 1, max: 32, onChange: v => setConfig({ numHeads: v }) },
-              { label: 'Head Dim', value: config.headDim, min: 32, max: 128, step: 16, onChange: v => setConfig({ headDim: v }) },
-              { label: 'KV Latent Dim', value: config.kvLatentDim, min: 8, max: 64, step: 8, onChange: v => setConfig({ kvLatentDim: v }) },
-              { label: 'RoPE Theta', value: config.ropeTheta, min: 1000, max: 100000, step: 1000, onChange: v => setConfig({ ropeTheta: v }) },
-              { label: 'RoPE Scale', value: config.ropeScale, min: 0.5, max: 2.0, step: 0.1, onChange: v => setConfig({ ropeScale: v }) }
+            params={[
+              { label: 'Batch Size', value: 1 },
+              { label: 'Sequence Length', value: 512 },
+              { label: 'Num Heads', value: 8 },
+              { label: 'Head Dim', value: 128 },
+              { label: 'Num KV Heads', value: 8 },
+              { label: 'KV Latent Dim', value: 64 },
+              { label: 'RoPE Theta', value: 10000 },
+              { label: 'RoPE Scale', value: 1.0 },
+              { label: 'Use RoPE', value: 'Enabled' },
+              { label: 'NoPE Size', value: 96 },
+              { label: 'RoPE Size', value: 32 },
             ]}
-            selects={[
-              { label: 'Use RoPE', value: config.useRoPE, options: [{ value: true, label: 'Enabled' }, { value: false, label: 'Disabled' }], onChange: v => setConfig({ useRoPE: v as boolean }) }
-            ]}
-          >
-            <button className="run-simulation-btn" onClick={runSimulation}>
-              <Play size={16} /> Run Simulation
-            </button>
-          </InputPanel>
+          />
+          <button className="run-simulation-btn" onClick={runSimulation} style={{ marginTop: '12px', width: '100%' }}>
+            <Play size={16} /> Run Simulation
+          </button>
         </div>
 
         <div className="center-panel">
@@ -97,14 +95,6 @@ const MLADecodeApp: React.FC<MLADecodeAppProps> = ({ onBack }) => {
                   <li><strong>Memory Efficient:</strong> {latentState.compressionRatio.toFixed(1)}x cache reduction</li>
                 </ul>
               </div>
-
-              <MetricsDashboard
-                metrics={performance}
-                additionalMetrics={[
-                  { label: 'Compression Ratio', value: latentState.compressionRatio.toFixed(1), unit: 'x' },
-                  { label: 'RoPE Theta', value: config.ropeTheta }
-                ]}
-              />
             </motion.div>
           </div>
 

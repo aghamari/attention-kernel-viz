@@ -22,7 +22,7 @@ interface UnifiedAttentionState {
   segments: SegmentInfo[];
   performance: PerformanceMetrics;
   currentPhase: 'idle' | 'qk' | 'softmax' | 'av' | 'reduction' | 'complete';
-  activeTab: 'pipeline' | 'algorithm' | '2d-vs-3d' | 'memory' | 'performance';
+  activeTab: 'pipeline' | 'algorithm' | 'pseudocode' | '2d-vs-3d' | 'memory' | 'performance';
   highlightedCell: { x: number; y: number; z: number } | null;
 
   // New: Step-by-step state

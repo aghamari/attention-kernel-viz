@@ -64,8 +64,17 @@ export const createUnifiedGlossaryEntries = (config: any): GlossaryEntry[] => {
 Use 2D if: seqLen ≤ 2048 OR useSlidingWindow = true
 Use 3D if: seqLen > 2048 AND useSlidingWindow = false
 
-2D Grid: (num_kv_heads, ⌈seqLen / blockM⌉)
-3D Grid: (⌈seqLen / blockM⌉, num_kv_heads, num_segments)`
+2D Grid (Triton 2D - Single-Pass):
+  grid = (num_kv_heads, total_num_q_blocks)
+  total_num_q_blocks = q_tokens // BLOCK_Q + num_seqs
+  BLOCK_Q = BLOCK_M // num_queries_per_kv
+
+3D Grid (Triton 3D - Split-KV):
+  grid = (total_num_q_blocks, num_kv_heads, NUM_SEGMENTS_PER_SEQ)
+  Requires intermediate buffers:
+    - segm_output[q_tokens, num_query_heads, NUM_SEGMENTS, HEAD_SIZE]
+    - segm_max[q_tokens, num_query_heads, NUM_SEGMENTS]
+    - segm_expsum[q_tokens, num_query_heads, NUM_SEGMENTS]`
     },
     {
       name: 'useSlidingWindow',
@@ -87,7 +96,7 @@ Use 3D if: seqLen > 2048 AND useSlidingWindow = false
       range: '64-2048',
       currentValue: config.windowSize || 256,
       defaultValue: 256,
-      description: 'Window size for sliding window attention. Only used when useSlidingWindow = true.',
+      description: 'Window size for sliding window attention (SLIDING_WINDOW = 1 + window_left in Triton kernel). Only used when useSlidingWindow = true.',
       sampleValues: [
         { value: 128, explanation: 'Small local window' },
         { value: 256, explanation: 'Standard window size' },
@@ -138,6 +147,54 @@ Final reduction combines all segments:
   O_final[q] = Σ(O_segment[q,i] × exp_sum[q,i]) / Σ(exp_sum[q,i])
 
 Where exp_sum = sum of exponentials for softmax normalization`
+    },
+    {
+      name: 'Triton 2D Example',
+      type: 'string',
+      category: 'technical',
+      range: 'N/A',
+      currentValue: 'N/A',
+      defaultValue: 'N/A',
+      description: 'Concrete example from attention_pipelines.md: batch=4 decode (q_tokens=4), num_kv_heads=8, BLOCK_Q=2',
+      sampleValues: [],
+      formula: `Example Configuration:
+  batch=4 decode (q_tokens=4)
+  num_kv_heads=8
+  BLOCK_Q=2
+
+Calculation:
+  total_num_q_blocks = 4 // 2 + 4 = 6
+  grid = (8, 6) = 48 workgroups
+
+Each workgroup (kv_head, q_block) processes:
+  - One tile of Q tokens against ALL KV tokens for that KV head
+  - Single-pass through entire KV sequence`
+    },
+    {
+      name: 'Triton 3D Example',
+      type: 'string',
+      category: 'technical',
+      range: 'N/A',
+      currentValue: 'N/A',
+      defaultValue: 'N/A',
+      description: 'Concrete example: batch=1 decode, kv_len=8192, num_kv_heads=8, NUM_SEGMENTS=16',
+      sampleValues: [],
+      formula: `Example Configuration:
+  batch=1 decode
+  kv_len=8192
+  num_kv_heads=8
+  NUM_SEGMENTS=16
+
+Calculation:
+  attention grid = (1, 8, 16) = 128 workgroups
+  reduce grid = (1, 64) = 64 workgroups  (64 = 8 kv_heads × 8 q_per_kv)
+
+Memory Required:
+  segm_output[1, 64, 16, HEAD_SIZE_PADDED] fp32
+  segm_max[1, 64, 16] fp32
+  segm_expsum[1, 64, 16] fp32
+
+Each attention workgroup processes kv_len/16 = 512 KV tokens`
     }
   ];
 

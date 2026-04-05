@@ -9,6 +9,12 @@ import HSTUAttentionApp from './apps/HSTUAttentionApp';
 import MLADecodeApp from './apps/MLADecodeApp';
 import SageAttentionApp from './apps/SageAttentionApp';
 import PODAttentionApp from './apps/PODAttentionApp';
+import CKUnifiedApp from './apps/CKUnifiedApp';
+import CKSplitKVApp from './apps/CKSplitKVApp';
+import CKPagedKVApp from './apps/CKPagedKVApp';
+import CKForwardApp from './apps/CKForwardApp';
+import FeatureMatrixApp from './apps/FeatureMatrixApp';
+import Triton2DVizApp from './apps/Triton2DVizApp';
 import { AttentionType } from './types/attention';
 
 function App() {
@@ -17,7 +23,7 @@ function App() {
   const renderApp = () => {
     switch (currentApp) {
       case 'unified':
-        return <UnifiedAttentionApp onBack={() => setCurrentApp('landing')} />;
+        return <UnifiedAttentionApp onBack={() => setCurrentApp('landing')} onNavigate={(type) => setCurrentApp(type as AttentionType)} />;
       case 'flash':
         return <FlashAttentionApp onBack={() => setCurrentApp('landing')} />;
       case 'paged':
@@ -32,6 +38,18 @@ function App() {
         return <SageAttentionApp onBack={() => setCurrentApp('landing')} />;
       case 'pod':
         return <PODAttentionApp onBack={() => setCurrentApp('landing')} />;
+      case 'ck-ua':
+        return <CKUnifiedApp onBack={() => setCurrentApp('landing')} />;
+      case 'ck-sk':
+        return <CKSplitKVApp onBack={() => setCurrentApp('landing')} />;
+      case 'ck-pk':
+        return <CKPagedKVApp onBack={() => setCurrentApp('landing')} />;
+      case 'ck-fwd':
+        return <CKForwardApp onBack={() => setCurrentApp('landing')} />;
+      case 'triton2d-viz':
+        return <Triton2DVizApp onBack={() => setCurrentApp('landing')} />;
+      case 'comparison':
+        return <FeatureMatrixApp onBack={() => setCurrentApp('landing')} onNavigate={(type) => setCurrentApp(type)} />;
       default:
         return <LandingPage onSelectKernel={(type) => setCurrentApp(type)} />;
     }

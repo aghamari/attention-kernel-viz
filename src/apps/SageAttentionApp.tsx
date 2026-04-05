@@ -1,9 +1,8 @@
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Play } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { useSageAttentionStore } from '../store/sageAttentionStore';
-import InputPanel from '../components/shared/InputPanel';
-import MetricsDashboard from '../components/shared/MetricsDashboard';
+import ConfigDisplay from '../components/shared/ConfigDisplay';
 import ParameterGlossary from '../components/shared/ParameterGlossary';
 import { createSageGlossaryEntries } from '../data/glossaries/sageGlossary';
 
@@ -14,13 +13,9 @@ interface SageAttentionAppProps {
 const SageAttentionApp: React.FC<SageAttentionAppProps> = ({ onBack }) => {
   const {
     config,
-    performance,
-    currentPhase,
     activeTab,
     quantizationState,
-    setConfig,
     setActiveTab,
-    runSimulation,
     updateQuantizationState
   } = useSageAttentionStore();
 
@@ -60,24 +55,20 @@ const SageAttentionApp: React.FC<SageAttentionAppProps> = ({ onBack }) => {
 
       <div className="overview-layout">
         <div className="left-panel">
-          <InputPanel
+          <ConfigDisplay
             title="Configuration"
-            sliders={[
-              { label: 'Sequence Length', value: config.seqLen, min: 64, max: 4096, step: 64, onChange: v => setConfig({ seqLen: v }) },
-              { label: 'Num Heads', value: config.numHeads, min: 1, max: 32, onChange: v => setConfig({ numHeads: v }) },
-              { label: 'Head Dim', value: config.headDim, min: 32, max: 128, step: 16, onChange: v => setConfig({ headDim: v }) }
+            params={[
+              { label: 'Batch Size', value: 1 },
+              { label: 'Sequence Length', value: 1024 },
+              { label: 'Num Heads', value: 8 },
+              { label: 'Head Dim', value: 64 },
+              { label: 'Num KV Heads', value: 8 },
+              { label: 'FP8', value: 'Enabled' },
+              { label: 'MxFP4', value: 'Disabled' },
+              { label: 'Per-Token Scale', value: 'Enabled' },
+              { label: 'Smooth K', value: 'Disabled' },
             ]}
-            selects={[
-              { label: 'FP8', value: config.useFP8, options: [{ value: true, label: 'Enabled' }, { value: false, label: 'Disabled' }], onChange: v => setConfig({ useFP8: v as boolean }) },
-              { label: 'MxFP4', value: config.useMxFP4, options: [{ value: false, label: 'Disabled' }, { value: true, label: 'Enabled' }], onChange: v => setConfig({ useMxFP4: v as boolean }) },
-              { label: 'Per-Token Scale', value: config.perTokenScale, options: [{ value: true, label: 'Enabled' }, { value: false, label: 'Per-Tensor' }], onChange: v => setConfig({ perTokenScale: v as boolean }) },
-              { label: 'Smooth K', value: config.smoothK, options: [{ value: true, label: 'Enabled' }, { value: false, label: 'Disabled' }], onChange: v => setConfig({ smoothK: v as boolean }) }
-            ]}
-          >
-            <button className="run-simulation-btn" onClick={runSimulation}>
-              <Play size={16} /> Run Simulation
-            </button>
-          </InputPanel>
+          />
         </div>
 
         <div className="center-panel">
@@ -94,13 +85,6 @@ const SageAttentionApp: React.FC<SageAttentionAppProps> = ({ onBack }) => {
                   <li><strong>MxFP4:</strong> Ultra-low precision variant for extreme efficiency</li>
                 </ul>
               </div>
-
-              <MetricsDashboard
-                metrics={performance}
-                additionalMetrics={[
-                  { label: 'Quantization Error', value: quantizationState.quantizationError.toFixed(4) }
-                ]}
-              />
             </motion.div>
           </div>
 

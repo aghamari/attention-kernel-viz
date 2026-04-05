@@ -1,9 +1,8 @@
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Play } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { usePODAttentionStore } from '../store/podAttentionStore';
-import InputPanel from '../components/shared/InputPanel';
-import MetricsDashboard from '../components/shared/MetricsDashboard';
+import ConfigDisplay from '../components/shared/ConfigDisplay';
 import ParameterGlossary from '../components/shared/ParameterGlossary';
 import { createPODGlossaryEntries } from '../data/glossaries/podGlossary';
 
@@ -14,15 +13,9 @@ interface PODAttentionAppProps {
 const PODAttentionApp: React.FC<PODAttentionAppProps> = ({ onBack }) => {
   const {
     config,
-    performance,
-    currentPhase,
     activeTab,
     workloadDistribution,
-    prefillProgress,
-    decodeProgress,
-    setConfig,
     setActiveTab,
-    runSimulation,
     setPrefillRatio,
     updateWorkloadDistribution
   } = usePODAttentionStore();
@@ -63,20 +56,20 @@ const PODAttentionApp: React.FC<PODAttentionAppProps> = ({ onBack }) => {
 
       <div className="overview-layout">
         <div className="left-panel">
-          <InputPanel
+          <ConfigDisplay
             title="Configuration"
-            sliders={[
-              { label: 'Batch Size', value: config.batchSize, min: 1, max: 32, onChange: v => setConfig({ batchSize: v }) },
-              { label: 'Prefill Seq Len', value: config.prefillSeqLen, min: 128, max: 4096, step: 128, onChange: v => setConfig({ prefillSeqLen: v }) },
-              { label: 'Decode Tokens', value: config.decodeNumTokens, min: 8, max: 256, step: 8, onChange: v => setConfig({ decodeNumTokens: v }) },
-              { label: 'Num Heads', value: config.numHeads, min: 1, max: 32, onChange: v => setConfig({ numHeads: v }) },
-              { label: 'Prefill Ratio', value: config.prefillRatio, min: 0.1, max: 0.9, step: 0.05, onChange: v => setPrefillRatio(v) }
+            params={[
+              { label: 'Batch Size', value: 4 },
+              { label: 'Sequence Length', value: 512 },
+              { label: 'Num Heads', value: 8 },
+              { label: 'Head Dim', value: 64 },
+              { label: 'Num KV Heads', value: 8 },
+              { label: 'Prefill Ratio', value: 0.7 },
+              { label: 'Decode Ratio', value: 0.3 },
+              { label: 'Prefill Seq Len', value: 512 },
+              { label: 'Decode Num Tokens', value: 32 }
             ]}
-          >
-            <button className="run-simulation-btn" onClick={runSimulation}>
-              <Play size={16} /> Run Simulation
-            </button>
-          </InputPanel>
+          />
         </div>
 
         <div className="center-panel">
@@ -94,13 +87,20 @@ const PODAttentionApp: React.FC<PODAttentionAppProps> = ({ onBack }) => {
                 </ul>
               </div>
 
-              <MetricsDashboard
-                metrics={performance}
-                additionalMetrics={[
-                  { label: 'Prefill CUs', value: workloadDistribution.prefillCUs.length },
-                  { label: 'Decode CUs', value: workloadDistribution.decodeCUs.length }
-                ]}
-              />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                <div style={{ padding: '20px', background: '#fff3e0', borderRadius: '8px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#ff9800' }}>
+                    {workloadDistribution.prefillCUs.length}
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#666', marginTop: '4px' }}>Prefill CUs</div>
+                </div>
+                <div style={{ padding: '20px', background: '#e3f2fd', borderRadius: '8px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#2196f3' }}>
+                    {workloadDistribution.decodeCUs.length}
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#666', marginTop: '4px' }}>Decode CUs</div>
+                </div>
+              </div>
             </motion.div>
           </div>
 
@@ -112,28 +112,11 @@ const PODAttentionApp: React.FC<PODAttentionAppProps> = ({ onBack }) => {
               </p>
 
               <div className="comparison-container">
-                <div className="comparison-side left" style={{
-                  background: currentPhase === 'prefill' ? '#fff3e0' : '#f8f9fa',
-                  border: currentPhase === 'prefill' ? '2px solid #ff9800' : 'none'
-                }}>
+                <div className="comparison-side left">
                   <h3 style={{ borderColor: '#ff9800', color: '#e65100' }}>Prefill Phase</h3>
                   <div style={{ marginBottom: '15px' }}>
-                    <div style={{ fontSize: '13px', color: '#666', marginBottom: '5px' }}>
+                    <div style={{ fontSize: '13px', color: '#666' }}>
                       Processing {config.prefillSeqLen} tokens
-                    </div>
-                    <div style={{ height: '20px', background: '#f0f0f0', borderRadius: '10px', overflow: 'hidden' }}>
-                      <motion.div
-                        style={{
-                          height: '100%',
-                          background: 'linear-gradient(90deg, #ff9800, #ff5722)',
-                          borderRadius: '10px'
-                        }}
-                        animate={{ width: `${prefillProgress}%` }}
-                        transition={{ duration: 0.3 }}
-                      />
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#888', marginTop: '5px' }}>
-                      {prefillProgress}% complete
                     </div>
                   </div>
                   <ul style={{ listStyle: 'none', padding: 0, fontSize: '13px' }}>
@@ -144,28 +127,11 @@ const PODAttentionApp: React.FC<PODAttentionAppProps> = ({ onBack }) => {
                   </ul>
                 </div>
 
-                <div className="comparison-side right" style={{
-                  background: currentPhase === 'decode' ? '#e3f2fd' : '#f8f9fa',
-                  border: currentPhase === 'decode' ? '2px solid #2196f3' : 'none'
-                }}>
+                <div className="comparison-side right">
                   <h3 style={{ borderColor: '#2196f3', color: '#1565c0' }}>Decode Phase</h3>
                   <div style={{ marginBottom: '15px' }}>
-                    <div style={{ fontSize: '13px', color: '#666', marginBottom: '5px' }}>
+                    <div style={{ fontSize: '13px', color: '#666' }}>
                       Generating {config.decodeNumTokens} tokens
-                    </div>
-                    <div style={{ height: '20px', background: '#f0f0f0', borderRadius: '10px', overflow: 'hidden' }}>
-                      <motion.div
-                        style={{
-                          height: '100%',
-                          background: 'linear-gradient(90deg, #2196f3, #00bcd4)',
-                          borderRadius: '10px'
-                        }}
-                        animate={{ width: `${decodeProgress}%` }}
-                        transition={{ duration: 0.3 }}
-                      />
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#888', marginTop: '5px' }}>
-                      {decodeProgress}% complete
                     </div>
                   </div>
                   <ul style={{ listStyle: 'none', padding: 0, fontSize: '13px' }}>

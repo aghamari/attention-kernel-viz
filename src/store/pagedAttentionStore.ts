@@ -22,7 +22,7 @@ interface PagedAttentionState {
   physicalBlocks: PhysicalBlock[];
   performance: PerformanceMetrics;
   currentPhase: 'idle' | 'allocate' | 'lookup' | 'compute' | 'partition' | 'reduce' | 'complete';
-  activeTab: 'overview' | 'block-table' | 'kv-cache' | 'v1-vs-v2' | 'reduction';
+  activeTab: 'overview' | 'pseudocode' | 'block-table' | 'kv-cache' | 'v1-vs-v2' | 'reduction';
   activeSequence: number;
 
   // Actions

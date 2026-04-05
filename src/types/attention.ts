@@ -81,6 +81,60 @@ export interface PODAttentionConfig extends BaseAttentionConfig {
   decodeNumTokens: number;
 }
 
+// CK-UA (CK Tile Unified Attention) Config
+export interface CKUnifiedConfig extends BaseAttentionConfig {
+  kBlockM: 16 | 32 | 64 | 128 | 256;  // Q tile size per tier
+  kBlockQ: number;                     // = kBlockM / numQueriesPerKv
+  pageBlockSize: 32 | 64;              // Page block size
+  maskType: 0 | 2;                     // 0=no_mask, 2=causal
+  tier: 'tiny' | 'bs32' | 'small' | 'medium' | 'large';
+  scaleS: number;                      // Softmax scale
+  scaleK: number;                      // K quantization scale
+  scaleV: number;                      // V quantization scale
+  isDecodeGrid: boolean;               // 2D decode vs 1D prefill
+  numQueriesPerKv: number;             // GQA ratio
+}
+
+// CK-SK (CK FMHA Split-KV) Config
+export interface CKSplitKVConfig extends BaseAttentionConfig {
+  numSplits: number;           // Chosen by heuristic (target = CU_count * 4)
+  maxSeqLenQ: number;
+  maxSeqLenK: number;
+  softmaxScale: number;
+  logitsSoftCap: number;       // 0 = disabled
+  windowSizeLeft: number;      // -1 = no window
+  windowSizeRight: number;
+  sinkSize: number;
+  isCausal: boolean;
+}
+
+// CK-PK (CK FMHA PagedKV) Config
+export interface CKPagedKVConfig extends BaseAttentionConfig {
+  bm0: 16 | 32 | 128;          // Q tile size
+  bn0: number;                  // KV tile size (typically 32)
+  pageSize: 32 | 64 | 128 | 256;
+  maxSeqLenQ: number;
+  maxSeqLenK: number;
+  windowSizeLeft: number;
+  windowSizeRight: number;
+  sinkSize: number;
+  isCausal: boolean;
+}
+
+// CK-Fwd (CK FMHA Forward Non-Paged) Config
+export interface CKForwardConfig extends BaseAttentionConfig {
+  bm0: number;                  // Q tile size
+  maxSeqLenQ: number;
+  maxSeqLenK: number;
+  softmaxScale: number;
+  logitsSoftCap: number;        // 0 = disabled
+  dropoutP: number;
+  windowSizeLeft: number;
+  windowSizeRight: number;
+  isCausal: boolean;
+  useBias: boolean;
+}
+
 // Grid launch info for visualization
 export interface GridLaunchInfo {
   gridX: number;
@@ -118,22 +172,6 @@ export interface PerformanceMetrics {
   arithmeticIntensity: number;
 }
 
-// Animation state
-export interface AnimationState {
-  isPlaying: boolean;
-  currentStep: number;
-  totalSteps: number;
-  speed: number;
-}
-
-// Visualization mode
-export type VisualizationMode =
-  | 'overview'
-  | 'grid-launch'
-  | 'memory-access'
-  | 'computation'
-  | 'reduction';
-
 // Sample tensor data for visualization
 export interface SampleTensor {
   shape: number[];          // Actual numeric shape
@@ -169,7 +207,13 @@ export type AttentionType =
   | 'hstu'
   | 'mla'
   | 'sage'
-  | 'pod';
+  | 'pod'
+  | 'ck-ua'
+  | 'ck-sk'
+  | 'ck-pk'
+  | 'ck-fwd'
+  | 'triton2d-viz'
+  | 'comparison';
 
 // Color schemes for different attention types
 export const ATTENTION_COLORS: Record<AttentionType, { primary: string; secondary: string; gradient: string }> = {
@@ -212,6 +256,36 @@ export const ATTENTION_COLORS: Record<AttentionType, { primary: string; secondar
     primary: '#a18cd1',
     secondary: '#fbc2eb',
     gradient: 'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)'
+  },
+  'ck-ua': {
+    primary: '#FF5722',
+    secondary: '#FF9800',
+    gradient: 'linear-gradient(135deg, #FF5722 0%, #FF9800 100%)'
+  },
+  'ck-sk': {
+    primary: '#00BCD4',
+    secondary: '#009688',
+    gradient: 'linear-gradient(135deg, #00BCD4 0%, #009688 100%)'
+  },
+  'ck-pk': {
+    primary: '#E91E63',
+    secondary: '#9C27B0',
+    gradient: 'linear-gradient(135deg, #E91E63 0%, #9C27B0 100%)'
+  },
+  'ck-fwd': {
+    primary: '#3F51B5',
+    secondary: '#2196F3',
+    gradient: 'linear-gradient(135deg, #3F51B5 0%, #2196F3 100%)'
+  },
+  'triton2d-viz': {
+    primary: '#e94560',
+    secondary: '#0f3460',
+    gradient: 'linear-gradient(135deg, #e94560 0%, #0f3460 100%)'
+  },
+  comparison: {
+    primary: '#607D8B',
+    secondary: '#455A64',
+    gradient: 'linear-gradient(135deg, #607D8B 0%, #455A64 100%)'
   }
 };
 
@@ -266,4 +340,133 @@ export function calculateMemoryBandwidth(config: BaseAttentionConfig): number {
   const qkvSize = config.batchSize * config.seqLen * config.numHeads * config.headDim * 4 * 3;
   const outputSize = config.batchSize * config.seqLen * config.numHeads * config.headDim * 4;
   return (qkvSize + outputSize) / 1e9; // GB
+}
+
+// CK-UA tier selection based on avg_q
+export function selectCKUATier(avgQ: number, maxSeqLenQ: number, blockSize: number): {
+  tier: 'tiny' | 'bs32' | 'small' | 'medium' | 'large';
+  kBlockM: 16 | 32 | 64 | 128 | 256;
+  warps: number;
+  mfma: string;
+} {
+  if (avgQ <= 2) {
+    return { tier: 'tiny', kBlockM: 16, warps: 1, mfma: '16x16x32' };
+  }
+  if (blockSize === 32 && avgQ <= 4) {
+    return { tier: 'bs32', kBlockM: 32, warps: 2, mfma: '16x16x32' };
+  }
+  if (avgQ <= 8) {
+    return { tier: 'small', kBlockM: 64, warps: 2, mfma: '32x32x16' };
+  }
+  if (maxSeqLenQ <= 128) {
+    return { tier: 'medium', kBlockM: 128, warps: 4, mfma: '32x32x16' };
+  }
+  return { tier: 'large', kBlockM: 256, warps: 8, mfma: '32x32x16' };
+}
+
+// CK-UA selector logic (from attention_pipelines.md)
+export function shouldUseCKUA(
+  maxSeqLenQ: number,
+  numSeqs: number,
+  numKvHeads: number,
+  windowSize: [number, number],
+  blockSize: number,
+  maxSeqLenK: number,
+  headSize: number,
+  numQueriesPerKv: number,
+  cuCount: number = 256
+): boolean {
+  if (maxSeqLenQ !== 1) return false;           // decode only
+  if (windowSize[0] !== -1 || windowSize[1] !== -1) return false;  // no sliding window
+  if (blockSize < 32) return false;
+  if (blockSize < 64 && maxSeqLenK < 256) return false;
+
+  // Only compiled for these configs
+  const validConfig =
+    (headSize === 64 && numQueriesPerKv === 8) ||
+    (headSize === 128 && numQueriesPerKv === 1);
+  if (!validConfig) return false;
+
+  const triton2dWgs = numKvHeads * numSeqs;
+  return cuCount * 4 <= triton2dWgs && triton2dWgs <= cuCount * 8;
+}
+
+// Calculate grid launch for CK-UA
+export function calculateCKUAGrid(
+  numKvHeads: number,
+  numSeqs: number,
+  totalNumQBlocks: number,
+  isDecodeGrid: boolean
+): GridLaunchInfo {
+  if (isDecodeGrid) {
+    // 2D decode grid: dim3(num_kv_heads, num_seqs)
+    return {
+      gridX: numKvHeads,
+      gridY: numSeqs,
+      gridZ: 1,
+      blockX: 256,
+      blockY: 1,
+      blockZ: 1,
+      totalThreads: numKvHeads * numSeqs * 256
+    };
+  } else {
+    // 1D prefill grid: dim3(num_kv_heads * total_num_q_blocks)
+    return {
+      gridX: numKvHeads * totalNumQBlocks,
+      gridY: 1,
+      gridZ: 1,
+      blockX: 256,
+      blockY: 1,
+      blockZ: 1,
+      totalThreads: numKvHeads * totalNumQBlocks * 256
+    };
+  }
+}
+
+// Calculate grid launch for CK-SK
+export function calculateCKSKGrid(
+  batchSize: number,
+  numHeadsQ: number,
+  numSplits: number,
+  maxSeqLenQ: number
+): { attention: GridLaunchInfo; combine: GridLaunchInfo } {
+  // Attention kernel: dim3(batch * nhead_q * num_splits)
+  const attentionTotal = batchSize * numHeadsQ * numSplits;
+  // Combine kernel: dim3(batch * nhead_q * max_seqlen_q)
+  const combineTotal = batchSize * numHeadsQ * maxSeqLenQ;
+
+  return {
+    attention: {
+      gridX: attentionTotal,
+      gridY: 1,
+      gridZ: 1,
+      blockX: 256,
+      blockY: 1,
+      blockZ: 1,
+      totalThreads: attentionTotal * 256
+    },
+    combine: {
+      gridX: combineTotal,
+      gridY: 1,
+      gridZ: 1,
+      blockX: 256,
+      blockY: 1,
+      blockZ: 1,
+      totalThreads: combineTotal * 256
+    }
+  };
+}
+
+// Calculate num_splits heuristic for CK-SK
+export function calculateNumSplits(
+  batchSize: number,
+  numHeadsK: number,
+  maxSeqLenQ: number,
+  cuCount: number = 256
+): number {
+  // Target = multiProcessorCount * 4
+  const target = cuCount * 4;
+  const baseWgs = batchSize * numHeadsK * maxSeqLenQ;
+  if (baseWgs >= target) return 1;
+  return Math.min(32, Math.ceil(target / baseWgs));
 }

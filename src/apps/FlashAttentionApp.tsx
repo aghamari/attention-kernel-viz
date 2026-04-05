@@ -1,9 +1,8 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Play } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { useFlashAttentionStore } from '../store/flashAttentionStore';
-import InputPanel from '../components/shared/InputPanel';
-import MetricsDashboard from '../components/shared/MetricsDashboard';
+import ConfigDisplay from '../components/shared/ConfigDisplay';
 import ParameterGlossary from '../components/shared/ParameterGlossary';
 import { createFlashGlossaryEntries } from '../data/glossaries/flashGlossary';
 
@@ -14,13 +13,9 @@ interface FlashAttentionAppProps {
 const FlashAttentionApp: React.FC<FlashAttentionAppProps> = ({ onBack }) => {
   const {
     config,
-    performance,
-    currentPhase,
     activeTab,
     onlineSoftmax,
-    setConfig,
     setActiveTab,
-    runSimulation,
     stepOnlineSoftmax,
     resetOnlineSoftmax
   } = useFlashAttentionStore();
@@ -60,25 +55,22 @@ const FlashAttentionApp: React.FC<FlashAttentionAppProps> = ({ onBack }) => {
 
       <div className="overview-layout">
         <div className="left-panel">
-          <InputPanel
+          <ConfigDisplay
             title="Configuration"
-            sliders={[
-              { label: 'Sequence Length', value: config.seqLen, min: 64, max: 4096, step: 64, onChange: v => setConfig({ seqLen: v }) },
-              { label: 'Num Heads', value: config.numHeads, min: 1, max: 32, onChange: v => setConfig({ numHeads: v }) },
-              { label: 'Head Dim', value: config.headDim, min: 32, max: 128, step: 16, onChange: v => setConfig({ headDim: v }) },
-              { label: 'Dropout', value: config.dropout, min: 0, max: 0.5, step: 0.05, onChange: v => setConfig({ dropout: v }) },
-              { label: 'Softmax Scale', value: config.softmaxScale, min: 0.05, max: 0.5, step: 0.01, onChange: v => setConfig({ softmaxScale: v }) }
+            params={[
+              { label: 'Batch Size', value: 1 },
+              { label: 'Sequence Length', value: 1024 },
+              { label: 'Num Heads', value: 8 },
+              { label: 'Head Dim', value: 64 },
+              { label: 'Num KV Heads', value: 8 },
+              { label: 'Dropout', value: 0.0 },
+              { label: 'Causal Mask', value: 'Enabled' },
+              { label: 'ALiBi', value: 'Disabled' },
+              { label: 'ALiBi Slope', value: 1.0 },
+              { label: 'FP8', value: 'Disabled' },
+              { label: 'Softmax Scale', value: 0.125 }
             ]}
-            selects={[
-              { label: 'Causal Mask', value: config.useCausalMask, options: [{ value: true, label: 'Enabled' }, { value: false, label: 'Disabled' }], onChange: v => setConfig({ useCausalMask: v as boolean }) },
-              { label: 'ALiBi', value: config.useAlibi, options: [{ value: false, label: 'Disabled' }, { value: true, label: 'Enabled' }], onChange: v => setConfig({ useAlibi: v as boolean }) },
-              { label: 'FP8', value: config.useFP8, options: [{ value: false, label: 'Disabled' }, { value: true, label: 'Enabled' }], onChange: v => setConfig({ useFP8: v as boolean }) }
-            ]}
-          >
-            <button className="run-simulation-btn" onClick={runSimulation}>
-              <Play size={16} /> Run Simulation
-            </button>
-          </InputPanel>
+          />
         </div>
 
         <div className="center-panel">
@@ -100,21 +92,15 @@ const FlashAttentionApp: React.FC<FlashAttentionAppProps> = ({ onBack }) => {
                 <h4 style={{ marginBottom: '15px' }}>Computation Pipeline</h4>
                 {['load-q', 'load-kv', 'qk-matmul', 'softmax', 'av-matmul', 'store'].map((phase, idx) => (
                   <div key={phase} className="flow-step">
-                    <div className="flow-step-number" style={{
-                      background: currentPhase === phase ? 'linear-gradient(135deg, #ff6b6b 0%, #4ecdc4 100%)' : undefined
-                    }}>
+                    <div className="flow-step-number">
                       {idx + 1}
                     </div>
                     <div className="flow-step-content">
-                      <h4 style={{ color: currentPhase === phase ? '#ff6b6b' : '#333' }}>
-                        {phase.replace('-', ' ').toUpperCase()}
-                      </h4>
+                      <h4>{phase.replace('-', ' ').toUpperCase()}</h4>
                     </div>
                   </div>
                 ))}
               </div>
-
-              <MetricsDashboard metrics={performance} />
             </motion.div>
           </div>
 

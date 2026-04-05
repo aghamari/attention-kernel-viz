@@ -8,7 +8,12 @@ import {
   Cpu,
   Sparkles,
   Split,
-  Gauge
+  Gauge,
+  Merge,
+  Database,
+  ArrowRightCircle,
+  Table,
+  Eye
 } from 'lucide-react';
 import { AttentionType, ATTENTION_COLORS } from './types/attention';
 
@@ -80,6 +85,41 @@ const kernelCards: KernelCard[] = [
     description: 'Prefill-Optimized Decode attention runs both prefill (context processing) and decode (token generation) workloads simultaneously on the same GPU. Configurable CU allocation ratios (e.g., 70% prefill, 30% decode) balance throughput. Improves GPU utilization in serving scenarios with mixed request types.',
     features: ['Dual Workload', 'CU Allocation', 'Prefill Ratio', 'Decode Ratio'],
     icon: <Split size={24} />
+  },
+  {
+    type: 'ck-ua',
+    title: 'CK-UA (CK Unified Attention)',
+    description: 'CK Tile single-kernel paged-KV attention with GQA head-merging optimization. Packs multiple Q-heads into M dimension for better per-workgroup efficiency. Tier-based tile sizes (Tiny/BS32/Small/Medium/Large) selected by avg_q. Uses MFMA GEMM operations. Optimal for decode with moderate batch sizes (128-256 seqs on 256 CUs).',
+    features: ['GQA Head-Merge', 'Tile Tiers', 'Paged KV', 'MFMA GEMM'],
+    icon: <Merge size={24} />
+  },
+  {
+    type: 'ck-sk',
+    title: 'CK-SK (CK FMHA Split-KV)',
+    description: 'Split-KV flash attention from CK Tile. Splits KV sequence across num_splits workgroups for parallel computation. Separate combine kernel merges partial results via log-sum-exp. Supports sliding window, sinks, softcap. Best for long KV sequences with low batch where parallelism matters.',
+    features: ['Split-KV', 'Combine Kernel', 'Log-Sum-Exp', 'Sliding Window'],
+    icon: <Activity size={24} />
+  },
+  {
+    type: 'ck-pk',
+    title: 'CK-PK (CK FMHA PagedKV)',
+    description: 'Non-split paged-KV forward attention for batch prefill. Uses per-token page lookups (not tile-level navigation). Single kernel, no combine step needed. Supports multiple page sizes (32/64/128/256). Called through mha_varlen_fwd_pagedkv() for prefill with paged KV cache.',
+    features: ['Per-Token Lookup', 'Batch Prefill', 'Single Kernel', 'Multi Page-Size'],
+    icon: <Database size={24} />
+  },
+  {
+    type: 'ck-fwd',
+    title: 'CK-Fwd (CK FMHA Forward)',
+    description: 'Standard flash-attention forward for contiguous (non-paged) KV tensors. Cannot use block_table - direct memory access only. Supports sliding window, causal mask, optional bias addition. Rarely used in vLLM-style inference which always pages, but useful for training or when KV is stored contiguously.',
+    features: ['Non-Paged', 'Contiguous KV', 'Direct Access', 'Optional Bias'],
+    icon: <ArrowRightCircle size={24} />
+  },
+  {
+    type: 'triton2d-viz',
+    title: 'Triton 2D Interactive Viz',
+    description: 'Step-by-step interactive visualization of Triton 2D unified attention with head-merge. See Q tile packing, page lookups, score matrix computation, causal masking, and online softmax — all with concrete data you can follow.',
+    features: ['Interactive', 'Head-Merge Viz', 'Page Lookup', 'Score Heatmap'],
+    icon: <Eye size={24} />
   }
 ];
 
@@ -93,7 +133,31 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectKernel }) => {
         transition={{ duration: 0.5 }}
       >
         <h1>Attention Kernel Visualizer</h1>
-        <p>Interactive visualization of 21+ attention kernel implementations from the aiter library</p>
+        <p>Interactive visualization of 12 attention kernel implementations</p>
+        <motion.button
+          className="comparison-button"
+          onClick={() => onSelectKernel('comparison')}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          style={{
+            marginTop: '20px',
+            padding: '12px 24px',
+            background: ATTENTION_COLORS.comparison.gradient,
+            border: 'none',
+            borderRadius: '8px',
+            color: 'white',
+            fontSize: '16px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            margin: '20px auto'
+          }}
+        >
+          <Table size={20} />
+          View Feature Comparison Matrix
+        </motion.button>
       </motion.div>
 
       <div className="kernel-grid">
@@ -134,8 +198,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectKernel }) => {
         transition={{ duration: 0.5, delay: 0.8 }}
         style={{ marginTop: '40px' }}
       >
-        <p>Attention Kernel Visualizer - Based on aiter library implementations</p>
-        <p>Unified 2D/3D | Flash MHA | Paged | Lean StreamK | HSTU | MLA | Sage | POD</p>
+        <p>Attention Kernel Visualizer - AIter Triton & CK-Tile implementations</p>
+        <p>Triton: Unified 2D/3D | Flash MHA | Paged | Lean StreamK | HSTU | MLA | Sage | POD</p>
+        <p>CK-Tile: CK-UA | CK-SK | CK-PK | CK-Fwd</p>
       </motion.footer>
     </div>
   );
