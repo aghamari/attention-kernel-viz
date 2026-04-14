@@ -128,6 +128,99 @@ const Triton2DVizApp: React.FC<Triton2DVizAppProps> = ({ onBack }) => {
             page_size = {config.pageSize} (tokens per physical page)
           </div>
         </div>
+
+        {/* Detailed parameter reference -- from pseudocode */}
+        <div style={{
+          marginTop: '16px',
+          padding: '16px 20px',
+          background: '#f8f9fa',
+          borderRadius: '10px',
+          border: '1px solid #dee2e6',
+          fontSize: '12px',
+          lineHeight: '1.7',
+          textAlign: 'left',
+          maxWidth: '900px',
+          marginLeft: 'auto',
+          marginRight: 'auto',
+        }}>
+          <strong style={{ fontSize: '13px', color: '#333' }}>Parameter Reference</strong>
+
+          {/* GEMM dimensions */}
+          <div style={{ marginTop: '10px', padding: '10px 12px', background: '#e8f5e9', borderRadius: '6px', border: '1px solid #a5d6a7' }}>
+            <strong style={{ color: '#2e7d32' }}>Core GEMM each iteration:</strong>
+            <pre style={{ margin: '6px 0 0', fontFamily: 'monospace', fontSize: '11px', whiteSpace: 'pre-wrap', color: '#333' }}>
+{`Q_tile    @ K_tile.T   = S
+[BLOCK_M, hdim] @ [hdim, BLOCK_N] = [BLOCK_M, BLOCK_N]
+[${config.BLOCK_M}, ${config.hdim}]        @ [${config.hdim}, ${config.BLOCK_N}]        = [${config.BLOCK_M}, ${config.BLOCK_N}]`}
+            </pre>
+          </div>
+
+          {/* Q_tile row layout */}
+          <div style={{ marginTop: '10px', padding: '10px 12px', background: '#e3f2fd', borderRadius: '6px', border: '1px solid #90caf9' }}>
+            <strong style={{ color: '#1565c0' }}>Q_tile [{config.BLOCK_M} rows] — head-merge layout:</strong>
+            <div style={{ fontSize: '11px', color: '#555', marginTop: '4px' }}>
+              Each token occupies {config.numQueriesPerKV} consecutive rows (one per Q head in the GQA group).
+              Row = tok × num_queries_per_kv + head_within_group.
+            </div>
+            <pre style={{ margin: '6px 0 0', fontFamily: 'monospace', fontSize: '10px', whiteSpace: 'pre-wrap', color: '#444' }}>
+{Array.from({ length: Math.min(config.BLOCK_M, 16) }, (_, row) => {
+  const tok = Math.floor(row / config.numQueriesPerKV);
+  const head = row % config.numQueriesPerKV;
+  const globalHead = head;
+  const isFirstOfGroup = head === 0;
+  const label = tok < config.seqLensQ[0]
+    ? `token ${tok}, head ${globalHead}`
+    : `padding (tok ${tok} >= q_len)`;
+  return `row ${String(row).padStart(2)}: ${label}${isFirstOfGroup && tok < config.seqLensQ[0] ? `    ← ${config.numQueriesPerKV} heads for token ${tok}` : ''}`;
+}).join('\n')}
+            </pre>
+            <div style={{ fontSize: '10px', color: '#888', marginTop: '4px' }}>
+              All {config.numQueriesPerKV} heads in a row-group share the same K/V (same kv_head), but have different Q vectors → different outputs.
+            </div>
+          </div>
+
+          {/* Data structure explanations */}
+          <div style={{ marginTop: '10px', padding: '10px 12px', background: '#fff8e1', borderRadius: '6px', border: '1px solid #ffe082' }}>
+            <strong style={{ color: '#f57f17' }}>Key data structures:</strong>
+            <div style={{ marginTop: '6px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px', fontSize: '11px' }}>
+              <div>
+                <code style={{ color: '#e65100' }}>Q_flat</code> [{config.seqLensQ.reduce((a: number, b: number) => a + b, 0)}, {config.nheadQ}, {config.hdim}] — all sequences' Q tokens concatenated along dim 0.
+                The <code>q</code> pointer from the function signature.
+              </div>
+              <div>
+                <code style={{ color: '#e65100' }}>cu_seqlens_q</code> = [{(() => {
+                  const csl = [0];
+                  for (const l of config.seqLensQ) csl.push(csl[csl.length - 1] + l);
+                  return csl.join(', ');
+                })()}] — cumulative token counts marking sequence boundaries in Q_flat.
+              </div>
+              <div>
+                <code style={{ color: '#e65100' }}>cum_q_blocks</code> = [{(() => {
+                  const cqb = [0];
+                  for (const l of config.seqLensQ) cqb.push(cqb[cqb.length - 1] + Math.ceil(l / config.BLOCK_Q));
+                  return cqb.join(', ');
+                })()}] — cumulative block counts. Used to map global block index → sequence via binary search.
+              </div>
+              <div>
+                <code style={{ color: '#e65100' }}>block_table</code> [{config.numSeqs} seqs, variable] — maps (seq, page_col) → physical page ID in GPU memory. Pages are non-contiguous.
+              </div>
+            </div>
+          </div>
+
+          {/* Page lookup formula */}
+          <div style={{ marginTop: '10px', padding: '10px 12px', background: '#fce4ec', borderRadius: '6px', border: '1px solid #f48fb1' }}>
+            <strong style={{ color: '#c62828' }}>Paged KV lookup (per KV position):</strong>
+            <pre style={{ margin: '6px 0 0', fontFamily: 'monospace', fontSize: '11px', whiteSpace: 'pre-wrap', color: '#333' }}>
+{`page_col  = kv_position ÷ page_size        (which logical page)
+phys_page = block_table[seq_idx][page_col]  (translate to physical)
+slot      = kv_position % page_size         (offset within the page)
+K[t]      = kv_cache[phys_page, slot, kv_head_idx, :]`}
+            </pre>
+            <div style={{ fontSize: '10px', color: '#888', marginTop: '4px' }}>
+              K/V loaded once per tile, shared by all {config.numQueriesPerKV} Q heads in this workgroup.
+            </div>
+          </div>
+        </div>
       </header>
 
       {/* Stage progress + controls -- STICKY */}

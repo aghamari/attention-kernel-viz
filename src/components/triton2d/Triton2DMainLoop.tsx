@@ -290,58 +290,87 @@ const Triton2DMainLoop: React.FC = () => {
       </div>
 
       {/* Matrix multiply visualization */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '8px',
-        padding: '10px',
-        background: '#f3e5f5',
-        borderRadius: '8px',
-        border: '1px solid #ce93d8',
-        marginBottom: '12px',
-        flexWrap: 'wrap',
-      }}>
-        <div style={{
-          padding: '6px 10px',
-          background: '#7b1fa2',
-          borderRadius: '6px',
-          color: 'white',
-          fontSize: '11px',
-          fontWeight: 600,
-          textAlign: 'center',
-        }}>
-          Q_tile<br />
-          <span style={{ fontSize: '9px', opacity: 0.8 }}>[{config.BLOCK_M} tok×heads × {config.hdim} hdim]</span>
-        </div>
-        <span style={{ fontSize: '16px', color: '#7b1fa2', fontWeight: 700 }}>@</span>
-        <div style={{
-          padding: '6px 10px',
-          background: '#1565c0',
-          borderRadius: '6px',
-          color: 'white',
-          fontSize: '11px',
-          fontWeight: 600,
-          textAlign: 'center',
-        }}>
-          K_tile.T<br />
-          <span style={{ fontSize: '9px', opacity: 0.8 }}>[{config.hdim} hdim × {config.BLOCK_N} kv_pos]</span>
-        </div>
-        <span style={{ fontSize: '16px', color: '#555', fontWeight: 700 }}>/ √{config.hdim}</span>
-        <span style={{ fontSize: '16px', color: '#555', fontWeight: 700 }}>=</span>
-        <div style={{
-          padding: '6px 10px',
-          background: '#e94560',
-          borderRadius: '6px',
-          color: 'white',
-          fontSize: '11px',
-          fontWeight: 600,
-          textAlign: 'center',
-        }}>
-          S<br />
-          <span style={{ fontSize: '9px', opacity: 0.8 }}>[{config.BLOCK_M} tok×heads × {config.BLOCK_N} kv_pos]</span>
-        </div>
-      </div>
+      {(() => {
+        const activeRows = Math.min(selectedWG.qLen, config.BLOCK_Q) * config.numQueriesPerKV;
+        const padRows = config.BLOCK_M - activeRows;
+        const realKV = Math.min(step.kvEnd, selectedWG.kvLen) - step.kvStart;
+        const padKV = config.BLOCK_N - realKV;
+        return (
+          <div style={{
+            padding: '10px',
+            background: '#f3e5f5',
+            borderRadius: '8px',
+            border: '1px solid #ce93d8',
+            marginBottom: '12px',
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              flexWrap: 'wrap',
+            }}>
+              <div style={{
+                padding: '6px 10px',
+                background: '#7b1fa2',
+                borderRadius: '6px',
+                color: 'white',
+                fontSize: '11px',
+                fontWeight: 600,
+                textAlign: 'center',
+              }}>
+                Q_tile<br />
+                <span style={{ fontSize: '9px', opacity: 0.8 }}>[BLOCK_M={config.BLOCK_M}, hdim={config.hdim}]</span>
+                <br />
+                <span style={{ fontSize: '8px', opacity: 0.7 }}>
+                  {activeRows} active ({selectedWG.qLen} tok × {config.numQueriesPerKV} heads){padRows > 0 ? `, ${padRows} pad` : ''}
+                </span>
+              </div>
+              <span style={{ fontSize: '16px', color: '#7b1fa2', fontWeight: 700 }}>@</span>
+              <div style={{
+                padding: '6px 10px',
+                background: '#1565c0',
+                borderRadius: '6px',
+                color: 'white',
+                fontSize: '11px',
+                fontWeight: 600,
+                textAlign: 'center',
+              }}>
+                K_tile.T<br />
+                <span style={{ fontSize: '9px', opacity: 0.8 }}>[hdim={config.hdim}, BLOCK_N={config.BLOCK_N}]</span>
+                <br />
+                <span style={{ fontSize: '8px', opacity: 0.7 }}>
+                  {realKV} real KV pos{padKV > 0 ? `, ${padKV} pad` : ''}
+                </span>
+              </div>
+              <span style={{ fontSize: '16px', color: '#555', fontWeight: 700 }}>/ √{config.hdim}</span>
+              <span style={{ fontSize: '16px', color: '#555', fontWeight: 700 }}>=</span>
+              <div style={{
+                padding: '6px 10px',
+                background: '#e94560',
+                borderRadius: '6px',
+                color: 'white',
+                fontSize: '11px',
+                fontWeight: 600,
+                textAlign: 'center',
+              }}>
+                S<br />
+                <span style={{ fontSize: '9px', opacity: 0.8 }}>[BLOCK_M={config.BLOCK_M}, BLOCK_N={config.BLOCK_N}]</span>
+                <br />
+                <span style={{ fontSize: '8px', opacity: 0.7 }}>
+                  {activeRows}×{realKV} meaningful, rest masked
+                </span>
+              </div>
+            </div>
+            <div style={{ fontSize: '10px', color: '#666', marginTop: '8px', textAlign: 'center' }}>
+              GEMM always runs on full [{config.BLOCK_M}×{config.hdim}] @ [{config.hdim}×{config.BLOCK_N}] tiles.
+              {padRows > 0 && ` Rows ${activeRows}–${config.BLOCK_M - 1} are zero-padded (token slots beyond q_len=${selectedWG.qLen}).`}
+              {padKV > 0 && ` KV cols ${realKV}–${config.BLOCK_N - 1} are zeros (past kv_len=${selectedWG.kvLen}).`}
+              {' '}Masked scores become −∞ and contribute 0 after softmax.
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Score matrix S */}
       <div style={{ marginBottom: '12px' }}>
